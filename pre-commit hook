@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Function to install gitleaks using curl pipe sh
+install_gitleaks() {
+    if [[ "$OS" == "linux-gnu"* ]]; then
+        curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz --output gitleaks.tar.gz
+    elif [[ "$OS" == "darwin"* ]]; then
+        curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_darwin_arm64.tar.gz --output gitleaks.tar.gz
+    else
+        echo "Error: Unsupported OS"
+        exit 1
+    fi
+
+    tar -xzf gitleaks.tar.gz || { echo "Error: Failed to extract gitleaks.tar.gz"; exit 1; }
+    chmod +x gitleaks || { echo "Error: Failed to set execute permissions for gitleaks"; exit 1; }
+    sudo mv gitleaks /usr/local/bin/ || { echo "Error: Failed to move gitleaks to /usr/local/bin/"; exit 1; }
+}
+
+# Get the path to the installed gitleaks
+GL_PATH=$(which gitleaks)
+
+# Check if gitleaks is installed, if not, install it
+if [ -z "$GL_PATH" ]; then
+    echo "Gitleaks is not found. Installing..."
+    install_gitleaks
+fi
+
+# Check if gitleaks check is enabled via git config
+GL_ENABLED=$(git config --get hooks.gitleaks)
+
+if [ "$GL_ENABLED" = "true" ]; then
+    # Execute gitleaks to check for secrets
+    gitleaks --verbose
+    if [ $? -ne 0 ]; then
+        echo "Error: Code has secrets. Commit rejected."
+        exit 1
+    else
+        echo "No secrets found. Commit allowed."
+        exit 0
+    fi
+else
+    echo "Gitleaks check is not enabled. Skipping..."
+    exit 0
+fi
